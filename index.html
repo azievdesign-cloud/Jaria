@@ -859,7 +859,10 @@ window.addEventListener('load', ()=>{
   mb.to(mbWords,{opacity:1,y:0,duration:2.2,stagger:.6,ease:'power2.inOut'}, 4.1);
   // payoff
   mb.to(mbWords,{opacity:.14,duration:.9}, 8.2);
-  mb.to('#mb-label',{opacity:.25,duration:.9}, 8.2);
+  // Dim only the active sentence. Animating the wrapper here lets this timeline
+  // cache opacity:0 from the separate approach reveal, which can hide the whole
+  // left column after scrolling down and back up.
+  mb.to('.lbl-b',{opacity:.36,duration:.9}, 8.2);
   mb.to('#mb-payoff .po-a',{opacity:1,y:0,duration:.6}, 8.4);
   mb.to('#mb-payoff .po-b',{opacity:1,y:0,duration:.6}, 8.75);
   // ending: the text SCROLLS UP and out (not a fade) while the shader melts the
