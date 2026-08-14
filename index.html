@@ -192,6 +192,9 @@ body.no-gl-mode .meet{margin-top:0}
 /* ── footer ────────────────────────────────── */
 .site-footer{background:var(--ice);color:var(--green);padding:4svh 0 5svh;overflow:hidden}
 .lifetime{font-size:14.2vw;line-height:1;letter-spacing:-.04em;font-weight:700;padding:0 clamp(16px,2vw,30px);white-space:nowrap}
+.lt-inner{display:inline-flex;align-items:baseline;white-space:nowrap}
+.lt-part{display:inline-flex;align-items:baseline}
+.lt-plus{font-size:.48em;margin-left:.1em;margin-right:.28em;transform:translateY(-.3em)}
 .lifetime .ch{display:inline-block;will-change:transform}
 .foot-row{align-items:start;padding-top:10svh}
 .foot-mark{grid-column:1/3;width:clamp(38px,3.6vw,52px);height:auto;color:var(--green)}
@@ -393,7 +396,9 @@ body.no-gl-mode .meet{margin-top:0}
 
 <!-- ═══ FOOTER ═══ -->
 <footer class="site-footer" id="footer">
-  <h2 class="lifetime" id="lifetime">Lifetime + Value</h2>
+  <h2 class="lifetime" id="lifetime" aria-label="Lifetime plus Value">
+    <span class="lt-part lt-lifetime">Lifetime</span><span class="lt-part lt-plus">+</span><span class="lt-part lt-value">Value</span>
+  </h2>
   <div class="foot-row grid12">
     <svg class="foot-mark" viewBox="0 0 51 54" fill="currentColor" aria-hidden="true"><use href="#jaria-mark"/></svg>
     <div class="foot-contact">
@@ -943,8 +948,14 @@ window.addEventListener('load', ()=>{
 
   /* ── footer: always exactly full canvas width + per-letter rise + velocity skew ── */
   const lt = document.getElementById('lifetime');
-  lt.innerHTML = '<span class="lt-inner" style="display:inline-block;white-space:nowrap">'
-    + [...lt.textContent].map(c=> c===' ' ? ' ' : `<span class="oh" style="display:inline-block"><span class="ch">${c}</span></span>`).join('')
+  const ltParts = [...lt.querySelectorAll('.lt-part')].map(part=>({
+    classes:part.className,
+    text:part.textContent.trim()
+  }));
+  lt.innerHTML = '<span class="lt-inner" aria-hidden="true">'
+    + ltParts.map(part=>`<span class="${part.classes}">`
+      + [...part.text].map(c=>`<span class="oh" style="display:inline-block"><span class="ch">${c}</span></span>`).join('')
+      + '</span>').join('')
     + '</span>';
   const ltInner = lt.querySelector('.lt-inner');
   function fitLifetime(){
