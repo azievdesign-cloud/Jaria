@@ -1,4 +1,4 @@
-const SOURCE_URL = 'https://raw.githubusercontent.com/azievdesign-cloud/Jaria/main/index.html?rev=98897da';
+const SOURCE_URL = 'https://raw.githubusercontent.com/azievdesign-cloud/Jaria/main/index.html?rev=e0c89f0';
 
 export default async function handler(_request, response) {
   const source = await fetch(SOURCE_URL);
