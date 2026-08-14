@@ -542,7 +542,7 @@ const layoutMedia = heroMedia.draw;
    ════════════════════════════════════════════ */
 const seqCanvas = document.getElementById('seq');
 const sctx = seqCanvas.getContext('2d');
-let seqImages = [], seqReady = false, seqProgress = 0;
+let seqImages = [], seqProgress = 0;
 
 function sizeCanvas(){
   const dpr = Math.min(devicePixelRatio||1, 2);
@@ -552,27 +552,42 @@ function sizeCanvas(){
   drawSeq(seqProgress);
 }
 if (SEQ_FRAMES.length){
-  seqImages = SEQ_FRAMES.map(src=>{const im=new Image(); im.src=src; return im;});
-  Promise.all(seqImages.map(im=>new Promise(r=>{im.onload=r; im.onerror=r;}))).then(()=>{seqReady=true; drawSeq(seqProgress);});
+  seqImages = SEQ_FRAMES.map((src,index)=>{
+    const im = new Image();
+    if (index < 10) im.fetchPriority = 'high';
+    im.onload = ()=>drawSeq(seqProgress);
+    im.src = src;
+    return im;
+  });
 }
 function drawSeq(p){
   seqProgress = p;
   const W = seqCanvas.clientWidth, H = seqCanvas.clientHeight;
-  if (SEQ_FRAMES.length && seqReady){
-    const im = seqImages[Math.min(seqImages.length-1, Math.floor(p*(seqImages.length-1)))];
+  sctx.clearRect(0,0,W,H);
+  if (SEQ_FRAMES.length){
+    const target = Math.min(seqImages.length-1, Math.floor(p*(seqImages.length-1)));
+    let index = target;
+    while (index >= 0 && !seqImages[index].naturalWidth) index--;
+    if (index < 0){
+      index = seqImages.findIndex(im=>im.naturalWidth);
+    }
+    const im = seqImages[index];
     if (im && im.naturalWidth){
-      sctx.clearRect(0,0,W,H);
       // Preserve the full sequence artwork on mobile; desktop keeps the
       // immersive edge-to-edge cover treatment.
       const fit = matchMedia('(max-width: 760px)').matches ? Math.min : Math.max;
       const s = fit(W/im.naturalWidth, H/im.naturalHeight);
       const w = im.naturalWidth*s, h = im.naturalHeight*s;
+      // Transparent artwork appears immediately and gently reaches full
+      // opacity over frames 1–10, using the section background underneath.
+      sctx.save();
+      sctx.globalAlpha = Math.min(1, (target+1)/10);
       sctx.drawImage(im,(W-w)/2,(H-h)/2,w,h);
+      sctx.restore();
     }
     return;
   }
   /* procedural placeholder: the mark draws itself + drifting brand-color fields */
-  sctx.clearRect(0,0,W,H);
   const cx=W*.62, cy=H*.56, R=Math.min(W,H)*.27;
   // soft drifting fields
   const fields=[[.18,.75,'rgba(171,191,228,0.35)'],[.85,.3,'rgba(16,39,22,0.10)'],[.5,.15,'rgba(171,191,228,0.22)']];
