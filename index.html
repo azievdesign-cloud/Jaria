@@ -954,25 +954,29 @@ window.addEventListener('load', ()=>{
     const startX = sourceBox.left, startY = sourceBox.top;
     const endX = targetBox.left, endY = targetBox.top;
     const targetScale = targetBox.height/sourceBox.height;
-    const controlX = startX+(endX-startX)*.32;
-    const controlY = endY+Math.min(120,innerHeight*.12);
+    const leftBow = Math.min(isMobile?88:150,innerWidth*(isMobile?.24:.12));
+    const upperBow = Math.min(isMobile?52:90,innerWidth*(isMobile?.14:.08));
+    const control1X = startX-leftBow;
+    const control1Y = startY-Math.min(isMobile?40:60,innerHeight*.05);
+    const control2X = endX-upperBow;
+    const control2Y = endY+Math.min(isMobile?185:210,innerHeight*.22);
     const flight = {p:0};
     const positionFlight = ()=>{
       const p=flight.p, q=1-p;
-      const x=q*q*startX+2*q*p*controlX+p*p*endX;
-      const y=q*q*startY+2*q*p*controlY+p*p*endY;
+      const x=q*q*q*startX+3*q*q*p*control1X+3*q*p*p*control2X+p*p*p*endX;
+      const y=q*q*q*startY+3*q*q*p*control1Y+3*q*p*p*control2Y+p*p*p*endY;
       const scale=1+(targetScale-1)*p;
       gsap.set(wrap,{x,y,scale});
     };
     gsap.set(wrap,{left:0,top:0,x:startX,y:startY,xPercent:0,yPercent:0,transformOrigin:'0 0'});
 
     const timing = isMobile ? {
-      hold:.52,morph:2.35,pause:.14,arc:1.55,handoff:1.41,
+      hold:.52,morph:2.35,pause:.14,arc:1.72,handoff:1.58,
       wipeStart:.38,wipe:1.20,mediaStart:.34,media:1.45,
       markStart:.50,mark:1.40,copyStart:.78,copy:1.20,
       subStart:.98,sub:.95,cueStart:1.42,done:1.84
     } : {
-      hold:.28,morph:1.55,pause:.10,arc:1.22,handoff:1.11,
+      hold:.28,morph:1.55,pause:.10,arc:1.40,handoff:1.27,
       wipeStart:.42,wipe:.95,mediaStart:.38,media:1.25,
       markStart:.50,mark:1.20,copyStart:.72,copy:1.05,
       subStart:.90,sub:.80,cueStart:1.35,done:1.65
@@ -985,7 +989,7 @@ window.addEventListener('load', ()=>{
       .to({}, {duration:timing.hold})
       .to(loaderCtl.state,{frame:loaderCtl.LAST,duration:timing.morph,ease:'power2.inOut',onUpdate:loaderCtl.render})
       .addLabel('travel','+='+timing.pause)
-      .to(flight,{p:1,duration:timing.arc,ease:'sine.inOut',onUpdate:positionFlight},'travel')
+      .to(flight,{p:1,duration:timing.arc,ease:'expo.inOut',onUpdate:positionFlight},'travel')
       .to('#loader-wash',{clipPath:'inset(0% 0% 100% 0%)',duration:timing.wipe,ease:'power3.inOut'},'travel+='+timing.wipeStart)
       .to('#hero-media',{clipPath:'inset(0% 0% 0% 0%)',duration:timing.media,ease:'power3.inOut'},'travel+='+timing.mediaStart)
       .to(markShift,{x:0,duration:timing.mark,ease:'power3.out',onUpdate:layoutMedia},'travel+='+timing.markStart)
