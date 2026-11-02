@@ -85,10 +85,9 @@ h1,h2,h3{font-weight:700;letter-spacing:-.03em}
 body.loader-active{overflow:hidden}
 .site-loader{position:fixed;inset:0;z-index:1000;pointer-events:none;isolation:isolate}
 .loader-wash{position:absolute;inset:0;background:var(--green);will-change:clip-path}
-.loader-logo-wrap{position:absolute;left:50%;top:50%;z-index:2;width:clamp(250px,42vw,520px);aspect-ratio:3.03/1;display:grid;place-items:center;transform:translate(-50%,-50%);transform-origin:center;will-change:transform,opacity}
-#loader-logo,.loader-symbol{grid-area:1/1}
-#loader-logo{display:block;width:100%;height:100%;opacity:0}
-.loader-symbol{width:auto;height:54%;color:var(--ice)}
+.loader-logo-wrap{position:absolute;left:50%;top:50%;z-index:2;width:clamp(250px,42vw,520px);aspect-ratio:3.0347/1;display:block;transform:translate(-50%,-50%);transform-origin:center;will-change:transform,opacity}
+#loader-logo{position:absolute;inset:0;display:block;width:100%;height:100%;min-width:0;min-height:0;opacity:0}
+.loader-symbol{position:absolute;left:50%;top:50%;width:auto;height:54%;transform:translate(-50%,-50%);color:var(--ice)}
 body.loader-canvas-on #loader-logo{opacity:1}
 body.loader-canvas-on .loader-symbol{opacity:0}
 body.loader-active .site-header{opacity:0}
@@ -678,8 +677,11 @@ const loaderCtl = (function(){
     const iw=im.naturalWidth, ih=im.naturalHeight;
     const sx=LOGO_CROP.x*iw, sy=LOGO_CROP.y*ih;
     const sw=LOGO_CROP.w*iw, sh=LOGO_CROP.h*ih;
-    wrap.style.aspectRatio = sw+'/'+sh;
-    const W=wrap.clientWidth, H=wrap.clientHeight;
+    const ratio=sw/sh;
+    wrap.style.aspectRatio = ratio+' / 1';
+    const W=wrap.clientWidth;
+    wrap.style.height = (W/ratio)+'px';
+    const H=wrap.clientHeight;
     if(!W || !H) return;
     const dpr=Math.min(devicePixelRatio||1,2);
     if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){
@@ -694,7 +696,21 @@ const loaderCtl = (function(){
     document.body.classList.add('loader-canvas-on');
   }
   addEventListener('resize',render);
-  return {state,render,ready:Promise.all([ready,last]),LAST:LOGO_LAST,SYMBOL:LOGO_SYMBOL};
+  const loaderFrameStep = isMobile ? 4 : 3;
+  const loaderFrameIndexes = [];
+  for(let i=LOGO_SYMBOL;i<=LOGO_LAST;i+=loaderFrameStep) loaderFrameIndexes.push(i);
+  if(loaderFrameIndexes[loaderFrameIndexes.length-1]!==LOGO_LAST) loaderFrameIndexes.push(LOGO_LAST);
+  const motionReady = Promise.allSettled(loaderFrameIndexes.map(i=>{
+    const im=seqImages[i];
+    if(!im) return Promise.resolve();
+    if(im.decode) return im.decode();
+    if(im.complete && im.naturalWidth) return Promise.resolve();
+    return new Promise(resolve=>{
+      im.addEventListener('load',resolve,{once:true});
+      im.addEventListener('error',resolve,{once:true});
+    });
+  }));
+  return {state,render,ready:Promise.all([ready,last,motionReady]),LAST:LOGO_LAST,SYMBOL:LOGO_SYMBOL};
 })();
 
 /* ════════════════════════════════════════════
@@ -930,29 +946,42 @@ window.addEventListener('load', ()=>{
     const midY = startY+(endY-startY)*.34-arcLift;
     gsap.set(wrap,{left:0,top:0,x:startX,y:startY,xPercent:0,yPercent:0,transformOrigin:'0 0'});
 
+    const timing = isMobile ? {
+      hold:.52,morph:2.35,pause:.30,arcOut:.46,arcIn:.90,
+      wipeStart:.38,wipe:1.20,mediaStart:.34,media:1.45,
+      markStart:.50,mark:1.40,copyStart:.78,copy:1.20,
+      subStart:.98,sub:.95,headerStart:1.40,logoOut:1.46,
+      cueStart:1.42,done:1.84
+    } : {
+      hold:.28,morph:1.55,pause:.18,arcOut:.38,arcIn:.78,
+      wipeStart:.42,wipe:.95,mediaStart:.38,media:1.25,
+      markStart:.50,mark:1.20,copyStart:.72,copy:1.05,
+      subStart:.90,sub:.80,headerStart:1.34,logoOut:1.38,
+      cueStart:1.35,done:1.65
+    };
     const intro = gsap.timeline({
       defaults:{ease:'power4.out'},
       onComplete:()=>{ dismissLoader(); ScrollTrigger.refresh(); }
     });
     intro
-      .to({}, {duration:.28})
-      .to(loaderCtl.state,{frame:loaderCtl.LAST,duration:1.55,ease:'power2.inOut',onUpdate:loaderCtl.render})
-      .addLabel('travel','+=.18')
-      .to(wrap,{x:midX,y:midY,scale:midScale,duration:.38,ease:'power2.in'},'travel')
-      .to(wrap,{x:endX,y:endY,scale:targetScale,duration:.78,ease:'power3.inOut'},'travel+=.38')
-      .to('#loader-wash',{clipPath:'inset(0% 0% 100% 0%)',duration:.95,ease:'power3.inOut'},'travel+=.42')
-      .to('#hero-media',{clipPath:'inset(0% 0% 0% 0%)',duration:1.25,ease:'power3.inOut'},'travel+=.38')
-      .to(markShift,{x:0,duration:1.2,ease:'power3.out',onUpdate:layoutMedia},'travel+=.5')
-      .to(heroLines,{yPercent:0,duration:1.05,stagger:.045,ease:'power4.out'},'travel+=.72')
-      .to('#hero-sub',{y:0,opacity:.92,duration:.8},'travel+=.9')
-      .to('.site-header',{opacity:1,duration:.25},'travel+=1.34')
-      .to(wrap,{opacity:0,duration:.18},'travel+=1.38')
-      .to('.hero-scrollcue',{opacity:1,duration:.4},'travel+=1.35')
-      .set(loader,{display:'none'},'travel+=1.65');
+      .to({}, {duration:timing.hold})
+      .to(loaderCtl.state,{frame:loaderCtl.LAST,duration:timing.morph,ease:'power2.inOut',onUpdate:loaderCtl.render})
+      .addLabel('travel','+='+timing.pause)
+      .to(wrap,{x:midX,y:midY,scale:midScale,duration:timing.arcOut,ease:'power2.in'},'travel')
+      .to(wrap,{x:endX,y:endY,scale:targetScale,duration:timing.arcIn,ease:'power3.inOut'},'travel+='+timing.arcOut)
+      .to('#loader-wash',{clipPath:'inset(0% 0% 100% 0%)',duration:timing.wipe,ease:'power3.inOut'},'travel+='+timing.wipeStart)
+      .to('#hero-media',{clipPath:'inset(0% 0% 0% 0%)',duration:timing.media,ease:'power3.inOut'},'travel+='+timing.mediaStart)
+      .to(markShift,{x:0,duration:timing.mark,ease:'power3.out',onUpdate:layoutMedia},'travel+='+timing.markStart)
+      .to(heroLines,{yPercent:0,duration:timing.copy,stagger:.045,ease:'power4.out'},'travel+='+timing.copyStart)
+      .to('#hero-sub',{y:0,opacity:.92,duration:timing.sub},'travel+='+timing.subStart)
+      .to('.site-header',{opacity:1,duration:.25},'travel+='+timing.headerStart)
+      .to(wrap,{opacity:0,duration:.18},'travel+='+timing.logoOut)
+      .to('.hero-scrollcue',{opacity:1,duration:.4},'travel+='+timing.cueStart)
+      .set(loader,{display:'none'},'travel+='+timing.done);
   };
   const logoReady = logoCtl && logoCtl.ready ? logoCtl.ready : Promise.resolve();
   const introReady = loaderCtl
-    ? Promise.race([Promise.all([loaderCtl.ready,logoReady]),new Promise(resolve=>setTimeout(resolve,1600))])
+    ? Promise.race([Promise.all([loaderCtl.ready,logoReady]),new Promise(resolve=>setTimeout(resolve,isMobile?2600:1600))])
     : Promise.resolve();
   introReady.then(playIntro);
 
