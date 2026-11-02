@@ -87,9 +87,7 @@ body.loader-active{overflow:hidden}
 .loader-wash{position:absolute;inset:0;background:var(--green);will-change:clip-path}
 .loader-logo-wrap{position:absolute;left:50%;top:50%;z-index:2;width:clamp(250px,42vw,520px);aspect-ratio:3.0347/1;display:block;transform:translate(-50%,-50%);transform-origin:center;will-change:transform,opacity}
 #loader-logo{position:absolute;inset:0;display:block;width:100%;height:100%;min-width:0;min-height:0;opacity:0;transition:opacity .22s ease}
-.loader-symbol{position:absolute;left:50%;top:50%;width:auto;height:54%;transform:translate(-50%,-50%);color:var(--ice);transition:opacity .22s ease}
 body.loader-canvas-on #loader-logo{opacity:1}
-body.loader-canvas-on .loader-symbol{opacity:0}
 body.loader-active .site-header{opacity:0}
 
 /* ── grain ─────────────────────────────────── */
@@ -296,7 +294,6 @@ body.no-gl-mode .meet{margin-top:0}
 <div class="site-loader" id="site-loader" aria-hidden="true">
   <div class="loader-wash" id="loader-wash"></div>
   <div class="loader-logo-wrap" id="loader-logo-wrap">
-    <svg class="loader-symbol" viewBox="0 0 51 54" fill="currentColor"><use href="#jaria-mark"/></svg>
     <canvas id="loader-logo"></canvas>
   </div>
 </div>
@@ -678,6 +675,8 @@ const loaderCtl = (function(){
     return {lo,hi,mix};
   }
   function render(){
+    // Never substitute the full lockup while the initial symbol is decoding.
+    if(!frameImg(LOGO_SYMBOL)) return;
     const frames = pair(state.frame);
     const im = frames.lo || frames.hi;
     if(!im) return;
@@ -710,7 +709,7 @@ const loaderCtl = (function(){
     document.body.classList.add('loader-canvas-on');
   }
   addEventListener('resize',render);
-  const loaderFrameStep = isMobile ? 4 : 3;
+  const loaderFrameStep = 1;
   const loaderFrameIndexes = [];
   for(let i=LOGO_SYMBOL;i<=LOGO_LAST;i+=loaderFrameStep) loaderFrameIndexes.push(i);
   if(loaderFrameIndexes[loaderFrameIndexes.length-1]!==LOGO_LAST) loaderFrameIndexes.push(LOGO_LAST);
@@ -956,9 +955,9 @@ window.addEventListener('load', ()=>{
     const targetScale = targetBox.height/sourceBox.height;
     const leftBow = Math.min(isMobile?88:150,innerWidth*(isMobile?.24:.12));
     const upperBow = Math.min(isMobile?52:90,innerWidth*(isMobile?.14:.08));
-    const control1X = startX-leftBow;
-    const control1Y = startY-Math.min(isMobile?40:60,innerHeight*.05);
-    const control2X = endX-upperBow;
+    const control1X = Math.max(12,startX-leftBow);
+    const control1Y = startY;
+    const control2X = Math.max(12,endX-upperBow);
     const control2Y = endY+Math.min(isMobile?185:210,innerHeight*.22);
     const flight = {p:0};
     const positionFlight = ()=>{
@@ -966,29 +965,31 @@ window.addEventListener('load', ()=>{
       const x=q*q*q*startX+3*q*q*p*control1X+3*q*p*p*control2X+p*p*p*endX;
       const y=q*q*q*startY+3*q*q*p*control1Y+3*q*p*p*control2Y+p*p*p*endY;
       const scale=1+(targetScale-1)*p;
-      gsap.set(wrap,{x,y,scale});
+      gsap.set(wrap,{x:x-startX,y:y-startY,scale});
     };
-    gsap.set(wrap,{left:0,top:0,x:startX,y:startY,xPercent:0,yPercent:0,transformOrigin:'0 0'});
+    // Freeze the measured box before GSAP takes over. Do not reinterpret the
+    // CSS translate(-50%,-50%) as a new pixel/percentage transform at startup.
+    wrap.style.transform='none';
+    wrap.style.left=startX+'px';
+    wrap.style.top=startY+'px';
+    gsap.set(wrap,{x:0,y:0,xPercent:0,yPercent:0,scale:1,transformOrigin:'0 0'});
 
-    const timing = isMobile ? {
-      hold:.52,morph:2.35,pause:.14,arc:1.72,handoff:1.58,
-      wipeStart:.38,wipe:1.20,mediaStart:.34,media:1.45,
-      markStart:.50,mark:1.40,copyStart:.78,copy:1.20,
-      subStart:.98,sub:.95,cueStart:1.42,done:1.84
-    } : {
-      hold:.28,morph:1.55,pause:.10,arc:1.40,handoff:1.27,
-      wipeStart:.42,wipe:.95,mediaStart:.38,media:1.25,
-      markStart:.50,mark:1.20,copyStart:.72,copy:1.05,
-      subStart:.90,sub:.80,cueStart:1.35,done:1.65
+    // Play the artwork at a steady 24 fps, independently of the expo flight.
+    // Both begin as soon as assets are ready: no hold or serial intro phases.
+    const morphDuration=(loaderCtl.LAST-loaderCtl.SYMBOL)/24;
+    const timing = {
+      morph:morphDuration,arc:morphDuration+.16,handoff:morphDuration+.16,
+      wipeStart:1.25,wipe:1.55,mediaStart:1.25,media:1.65,
+      markStart:1.35,mark:1.60,copyStart:1.60,copy:1.20,
+      subStart:1.85,sub:.95,cueStart:2.65,done:morphDuration+.42
     };
     const intro = gsap.timeline({
       defaults:{ease:'power4.out'},
       onComplete:()=>{ dismissLoader(); ScrollTrigger.refresh(); }
     });
     intro
-      .to({}, {duration:timing.hold})
-      .to(loaderCtl.state,{frame:loaderCtl.LAST,duration:timing.morph,ease:'power2.inOut',onUpdate:loaderCtl.render})
-      .addLabel('travel','+='+timing.pause)
+      .addLabel('travel',0)
+      .to(loaderCtl.state,{frame:loaderCtl.LAST,duration:timing.morph,ease:'none',onUpdate:loaderCtl.render},0)
       .to(flight,{p:1,duration:timing.arc,ease:'expo.inOut',onUpdate:positionFlight},'travel')
       .to('#loader-wash',{clipPath:'inset(0% 0% 100% 0%)',duration:timing.wipe,ease:'power3.inOut'},'travel+='+timing.wipeStart)
       .to('#hero-media',{clipPath:'inset(0% 0% 0% 0%)',duration:timing.media,ease:'power3.inOut'},'travel+='+timing.mediaStart)
